@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../driver/splash_screen.dart';
-import '../driver/login_screen.dart';
-import '../driver/select_vehicle_screen.dart';
-import '../driver/onboard_vehicle_screen.dart';
-import '../driver/upload_rc_screen.dart';
-import '../driver/profile_info_screen.dart';
-import '../driver/home_screen.dart';
-import '../driver/earnings_statement_screen.dart';
+import '../driver/home/splash_screen.dart';
+import '../driver/auth/login_screen.dart';
+import '../driver/registration/select_vehicle_screen.dart';
+import '../driver/registration/onboard_vehicle_screen.dart';
+import '../driver/registration/upload_rc_screen.dart';
+import '../driver/registration/profile_info_screen.dart';
+import '../driver/home/home_screen.dart';
+import '../driver/earnings/earnings_statement_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
