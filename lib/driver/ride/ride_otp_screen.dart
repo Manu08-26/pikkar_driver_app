@@ -148,159 +148,179 @@ class _RideOTPScreenState extends State<RideOTPScreen> {
           ),
         ),
         body: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.all(Responsive.padding(context, 24)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: Responsive.spacing(context, 20)),
-
-                // Icon
-                Center(
-                  child: Container(
-                    width: Responsive.wp(context, 24),
-                    height: Responsive.wp(context, 24),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.lock_outline,
-                      size: Responsive.iconSize(context, 48),
-                      color: Colors.green,
-                    ),
-                  ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                // Ensures content scrolls when keyboard is open (prevents overflow)
+                padding: EdgeInsets.only(
+                  left: Responsive.padding(context, 24),
+                  right: Responsive.padding(context, 24),
+                  top: Responsive.padding(context, 24),
+                  bottom:
+                      Responsive.padding(context, 24) + MediaQuery.viewInsetsOf(context).bottom,
                 ),
-                SizedBox(height: Responsive.spacing(context, 32)),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: Responsive.spacing(context, 20)),
 
-                // Title
-                Center(
-                  child: Text(
-                    'Ask customer for OTP',
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 24),
-                      fontWeight: FontWeight.bold,
-                      color: _appTheme.textColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                SizedBox(height: Responsive.spacing(context, 8)),
-
-                // Description
-                Center(
-                  child: Text(
-                    'Customer will provide a 4-digit OTP\nto start the ride',
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 14),
-                      color: _appTheme.textGrey,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                SizedBox(height: Responsive.spacing(context, 48)),
-
-                // OTP Input Fields
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(4, (index) {
-                    return SizedBox(
-                      width: Responsive.wp(context, 16),
-                      height: Responsive.hp(context, 8),
-                      child: TextField(
-                        controller: _otpControllers[index],
-                        focusNode: _focusNodes[index],
-                        textAlign: TextAlign.center,
-                        keyboardType: TextInputType.number,
-                        maxLength: 1,
-                        style: TextStyle(
-                          fontSize: Responsive.fontSize(context, 24),
-                          fontWeight: FontWeight.bold,
-                          color: _appTheme.textColor,
-                        ),
-                        decoration: InputDecoration(
-                          counterText: '',
-                          filled: true,
-                          fillColor: _appTheme.iconBgColor,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: _appTheme.dividerColor,
+                        // Icon
+                        Center(
+                          child: Container(
+                            width: Responsive.wp(context, 24),
+                            height: Responsive.wp(context, 24),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              shape: BoxShape.circle,
                             ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: _appTheme.dividerColor,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
+                            child: Icon(
+                              Icons.lock_outline,
+                              size: Responsive.iconSize(context, 48),
                               color: Colors.green,
-                              width: 2,
                             ),
                           ),
                         ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: (value) => _handleOTPInput(index, value),
-                      ),
-                    );
-                  }),
-                ),
-                SizedBox(height: Responsive.spacing(context, 48)),
+                        SizedBox(height: Responsive.spacing(context, 32)),
 
-                // Verify Button
-                SizedBox(
-                  width: double.infinity,
-                  height: Responsive.hp(context, 6.5),
-                  child: ElevatedButton(
-                    onPressed: _isVerifying ? null : _verifyOTP,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      disabledBackgroundColor: Colors.green.withOpacity(0.6),
-                    ),
-                    child: _isVerifying
-                        ? SizedBox(
-                            width: Responsive.iconSize(context, 24),
-                            height: Responsive.iconSize(context, 24),
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Text(
-                            'Verify & Start Ride',
+                        // Title
+                        Center(
+                          child: Text(
+                            'Ask customer for OTP',
                             style: TextStyle(
-                              fontSize: Responsive.fontSize(context, 16),
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              fontSize: Responsive.fontSize(context, 24),
+                              fontWeight: FontWeight.bold,
+                              color: _appTheme.textColor,
                             ),
+                            textAlign: TextAlign.center,
                           ),
-                  ),
-                ),
-                const Spacer(),
+                        ),
+                        SizedBox(height: Responsive.spacing(context, 8)),
 
-                // Help Text
-                Center(
-                  child: Text(
-                    'OTP is provided by the customer',
-                    style: TextStyle(
-                      fontSize: Responsive.fontSize(context, 12),
-                      color: _appTheme.textGrey,
+                        // Description
+                        Center(
+                          child: Text(
+                            'Customer will provide a 4-digit OTP\nto start the ride',
+                            style: TextStyle(
+                              fontSize: Responsive.fontSize(context, 14),
+                              color: _appTheme.textGrey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        SizedBox(height: Responsive.spacing(context, 48)),
+
+                        // OTP Input Fields
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: List.generate(4, (index) {
+                            return SizedBox(
+                              width: Responsive.wp(context, 16),
+                              height: Responsive.hp(context, 8),
+                              child: TextField(
+                                controller: _otpControllers[index],
+                                focusNode: _focusNodes[index],
+                                textAlign: TextAlign.center,
+                                keyboardType: TextInputType.number,
+                                maxLength: 1,
+                                style: TextStyle(
+                                  fontSize: Responsive.fontSize(context, 24),
+                                  fontWeight: FontWeight.bold,
+                                  color: _appTheme.textColor,
+                                ),
+                                decoration: InputDecoration(
+                                  counterText: '',
+                                  filled: true,
+                                  fillColor: _appTheme.iconBgColor,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: _appTheme.dividerColor,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: _appTheme.dividerColor,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(
+                                      color: Colors.green,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                onChanged: (value) =>
+                                    _handleOTPInput(index, value),
+                              ),
+                            );
+                          }),
+                        ),
+                        SizedBox(height: Responsive.spacing(context, 48)),
+
+                        // Verify Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: Responsive.hp(context, 6.5),
+                          child: ElevatedButton(
+                            onPressed: _isVerifying ? null : _verifyOTP,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              disabledBackgroundColor:
+                                  Colors.green.withOpacity(0.6),
+                            ),
+                            child: _isVerifying
+                                ? SizedBox(
+                                    width: Responsive.iconSize(context, 24),
+                                    height: Responsive.iconSize(context, 24),
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
+                                  )
+                                : Text(
+                                    'Verify & Start Ride',
+                                    style: TextStyle(
+                                      fontSize:
+                                          Responsive.fontSize(context, 16),
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        // Help Text
+                        Center(
+                          child: Text(
+                            'OTP is provided by the customer',
+                            style: TextStyle(
+                              fontSize: Responsive.fontSize(context, 12),
+                              color: _appTheme.textGrey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),

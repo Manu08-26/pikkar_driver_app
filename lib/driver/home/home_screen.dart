@@ -21,6 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isOnDuty = false;
   double _todayEarnings = 530.0;
   LatLng? _currentLocation;
+  bool _showWhiteBackground = false;
 
   // Default location (Hyderabad)
   static const LatLng _defaultLocation = LatLng(17.385044, 78.486671);
@@ -130,6 +131,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 zoomControlsEnabled: false,
                 mapToolbarEnabled: false,
                 compassEnabled: true,
+                onCameraMove: (position) {
+                  // Show white background when map is moved
+                  if (!_showWhiteBackground) {
+                    setState(() {
+                      _showWhiteBackground = true;
+                    });
+                  }
+                },
               ),
 
               // Top Bar
@@ -137,8 +146,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 top: 0,
                 left: 0,
                 right: 0,
-                child: Container(
-                  color: Colors.white,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  decoration: BoxDecoration(
+                    color: _showWhiteBackground 
+                        ? Colors.white 
+                        : Colors.transparent,
+                    boxShadow: _showWhiteBackground
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
                   child: Column(
                     children: [
                       // Header with menu, duty toggle, notifications
