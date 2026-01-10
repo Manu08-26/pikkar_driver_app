@@ -1,26 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/models/ride_model.dart';
+import '../../core/providers/ride_provider.dart';
 import 'ride_navigation_screen.dart';
 
 class RideRequestScreen extends StatefulWidget {
-  final String pickupAddress;
-  final String pickupDetails;
-  final String dropAddress;
-  final String dropDetails;
-  final double distance;
-  final double fare;
+  final RideModel ride;
 
   const RideRequestScreen({
     super.key,
-    required this.pickupAddress,
-    required this.pickupDetails,
-    required this.dropAddress,
-    required this.dropDetails,
-    required this.distance,
-    required this.fare,
+    required this.ride,
   });
 
   @override
@@ -33,9 +26,7 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
   int _countdown = 15;
   Timer? _timer;
   Set<Marker> _markers = {};
-
-  static const LatLng _pickupLocation = LatLng(17.385044, 78.486671);
-  static const LatLng _dropLocation = LatLng(17.4239, 78.4738);
+  bool _isAccepting = false;
 
   @override
   void initState() {
@@ -58,18 +49,27 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
   }
 
   void _setupMarkers() {
+    final pickupLoc = LatLng(
+      widget.ride.pickupLocation.latitude,
+      widget.ride.pickupLocation.longitude,
+    );
+    final dropLoc = LatLng(
+      widget.ride.dropoffLocation.latitude,
+      widget.ride.dropoffLocation.longitude,
+    );
+
     _markers = {
       Marker(
         markerId: const MarkerId('pickup'),
-        position: _pickupLocation,
+        position: pickupLoc,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        infoWindow: InfoWindow(title: widget.pickupAddress),
+        infoWindow: InfoWindow(title: widget.ride.pickupLocation.address),
       ),
       Marker(
         markerId: const MarkerId('drop'),
-        position: _dropLocation,
+        position: dropLoc,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: InfoWindow(title: widget.dropAddress),
+        infoWindow: InfoWindow(title: widget.ride.dropoffLocation.address),
       ),
     };
   }
@@ -93,25 +93,34 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
   }
 
   void _fitMarkersInMap() {
-    if (_mapController != null) {
+    if (_mapController != null && _markers.isNotEmpty) {
+      final pickupLoc = LatLng(
+        widget.ride.pickupLocation.latitude,
+        widget.ride.pickupLocation.longitude,
+      );
+      final dropLoc = LatLng(
+        widget.ride.dropoffLocation.latitude,
+        widget.ride.dropoffLocation.longitude,
+      );
+
       _mapController!.animateCamera(
         CameraUpdate.newLatLngBounds(
           LatLngBounds(
             southwest: LatLng(
-              _pickupLocation.latitude < _dropLocation.latitude
-                  ? _pickupLocation.latitude
-                  : _dropLocation.latitude,
-              _pickupLocation.longitude < _dropLocation.longitude
-                  ? _pickupLocation.longitude
-                  : _dropLocation.longitude,
+              pickupLoc.latitude < dropLoc.latitude
+                  ? pickupLoc.latitude
+                  : dropLoc.latitude,
+              pickupLoc.longitude < dropLoc.longitude
+                  ? pickupLoc.longitude
+                  : dropLoc.longitude,
             ),
             northeast: LatLng(
-              _pickupLocation.latitude > _dropLocation.latitude
-                  ? _pickupLocation.latitude
-                  : _dropLocation.latitude,
-              _pickupLocation.longitude > _dropLocation.longitude
-                  ? _pickupLocation.longitude
-                  : _dropLocation.longitude,
+              pickupLoc.latitude > dropLoc.latitude
+                  ? pickupLoc.latitude
+                  : dropLoc.latitude,
+              pickupLoc.longitude > dropLoc.longitude
+                  ? pickupLoc.longitude
+                  : dropLoc.longitude,
             ),
           ),
           100,
@@ -120,29 +129,53 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
     }
   }
 
-  void _acceptRide() {
+  Future<void> _acceptRide() async {
+    setState(() {
+      _isAccepting = true;
+    });
+
     _timer?.cancel();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RideNavigationScreen(
-          pickupAddress: widget.pickupAddress,
-          pickupDetails: widget.pickupDetails,
-          dropAddress: widget.dropAddress,
-          dropDetails: widget.dropDetails,
-          distance: widget.distance,
-          fare: widget.fare,
+    
+    final rideProvider = Provider.of<RideProvider>(context, listen: false);
+    final success = await rideProvider.acceptRide(widget.ride.id);
+
+    if (success && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RideNavigationScreen(
+            ride: widget.ride,
+          ),
         ),
-      ),
-    );
+      );
+    } else if (mounted) {
+      setState(() {
+        _isAccepting = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(rideProvider.errorMessage ?? 'Failed to accept ride'),
+          backgroundColor: _appTheme.brandRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _rejectRide() {
+    final rideProvider = Provider.of<RideProvider>(context, listen: false);
+    rideProvider.removePendingRide(widget.ride.id);
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
+    final pickupLoc = LatLng(
+      widget.ride.pickupLocation.latitude,
+      widget.ride.pickupLocation.longitude,
+    );
+
     return Directionality(
       textDirection: _appTheme.textDirection,
       child: Scaffold(
@@ -153,8 +186,8 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
               // Map
               GoogleMap(
                 onMapCreated: _onMapCreated,
-                initialCameraPosition: const CameraPosition(
-                  target: _pickupLocation,
+                initialCameraPosition: CameraPosition(
+                  target: pickupLoc,
                   zoom: 12.0,
                 ),
                 markers: _markers,
@@ -242,7 +275,7 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Distance : ${widget.distance}KM',
+                            'Distance : ${widget.ride.distance.toStringAsFixed(1)}KM',
                             style: TextStyle(
                               fontSize: Responsive.fontSize(context, 16),
                               fontWeight: FontWeight.w600,
@@ -250,7 +283,7 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                             ),
                           ),
                           Text(
-                            'Pay : ₹${widget.fare.toStringAsFixed(0)}/-',
+                            'Pay : ₹${(widget.ride.estimatedFare ?? 0).toStringAsFixed(0)}/-',
                             style: TextStyle(
                               fontSize: Responsive.fontSize(context, 18),
                               fontWeight: FontWeight.bold,
@@ -293,22 +326,12 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        widget.pickupAddress,
+                                        widget.ride.pickupLocation.address,
                                         style: TextStyle(
                                           fontSize:
                                               Responsive.fontSize(context, 16),
                                           fontWeight: FontWeight.w600,
                                           color: _appTheme.textColor,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                          height: Responsive.spacing(context, 4)),
-                                      Text(
-                                        widget.pickupDetails,
-                                        style: TextStyle(
-                                          fontSize:
-                                              Responsive.fontSize(context, 12),
-                                          color: _appTheme.textGrey,
                                         ),
                                       ),
                                     ],
@@ -345,22 +368,12 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        widget.dropAddress,
+                                        widget.ride.dropoffLocation.address,
                                         style: TextStyle(
                                           fontSize:
                                               Responsive.fontSize(context, 16),
                                           fontWeight: FontWeight.w600,
                                           color: _appTheme.textColor,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                          height: Responsive.spacing(context, 4)),
-                                      Text(
-                                        widget.dropDetails,
-                                        style: TextStyle(
-                                          fontSize:
-                                              Responsive.fontSize(context, 12),
-                                          color: _appTheme.textGrey,
                                         ),
                                       ),
                                     ],
@@ -394,7 +407,7 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                                 size: Responsive.iconSize(context, 32),
                                 color: _appTheme.textColor,
                               ),
-                              onPressed: _rejectRide,
+                              onPressed: _isAccepting ? null : _rejectRide,
                             ),
                           ),
                           SizedBox(width: Responsive.spacing(context, 16)),
@@ -403,7 +416,7 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                             child: SizedBox(
                               height: Responsive.hp(context, 7),
                               child: ElevatedButton(
-                                onPressed: _acceptRide,
+                                onPressed: _isAccepting ? null : _acceptRide,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
                                   elevation: 0,
@@ -411,27 +424,37 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'Accept Ride',
-                                      style: TextStyle(
-                                        fontSize:
-                                            Responsive.fontSize(context, 18),
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                child: _isAccepting
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                              Colors.white),
+                                        ),
+                                      )
+                                    : Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Accept Ride',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  Responsive.fontSize(context, 18),
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          SizedBox(
+                                              width: Responsive.spacing(context, 8)),
+                                          Icon(
+                                            Icons.double_arrow,
+                                            color: Colors.white,
+                                            size: Responsive.iconSize(context, 24),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                    SizedBox(
-                                        width: Responsive.spacing(context, 8)),
-                                    Icon(
-                                      Icons.double_arrow,
-                                      color: Colors.white,
-                                      size: Responsive.iconSize(context, 24),
-                                    ),
-                                  ],
-                                ),
                               ),
                             ),
                           ),
@@ -442,43 +465,14 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
                 ),
               ),
 
-              // Navigation Button (Top Right)
+              // Current Location Button
               Positioned(
                 bottom: Responsive.hp(context, 45),
                 right: Responsive.padding(context, 16),
                 child: FloatingActionButton(
                   onPressed: () {
-                    // Open navigation app
-                  },
-                  backgroundColor: Colors.white,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.navigation,
-                        color: Colors.blue.shade600,
-                        size: Responsive.iconSize(context, 18),
-                      ),
-                      SizedBox(width: Responsive.spacing(context, 4)),
-                      Text(
-                        'Nav',
-                        style: TextStyle(
-                          color: _appTheme.textColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Current Location Button
-              Positioned(
-                bottom: Responsive.hp(context, 45),
-                right: Responsive.padding(context, 90),
-                child: FloatingActionButton(
-                  onPressed: () {
                     // Center to current location
+                    _fitMarkersInMap();
                   },
                   backgroundColor: Colors.white,
                   mini: true,
@@ -496,4 +490,3 @@ class _RideRequestScreenState extends State<RideRequestScreen> {
     );
   }
 }
-

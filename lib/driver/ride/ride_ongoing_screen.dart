@@ -3,22 +3,15 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/models/ride_model.dart';
 import 'ride_complete_screen.dart';
 
 class RideOngoingScreen extends StatefulWidget {
-  final String pickupAddress;
-  final String dropAddress;
-  final String dropDetails;
-  final double distance;
-  final double fare;
+  final RideModel ride;
 
   const RideOngoingScreen({
     super.key,
-    required this.pickupAddress,
-    required this.dropAddress,
-    required this.dropDetails,
-    required this.distance,
-    required this.fare,
+    required this.ride,
   });
 
   @override
@@ -94,7 +87,7 @@ class _RideOngoingScreenState extends State<RideOngoingScreen> {
         markerId: const MarkerId('drop'),
         position: _dropLocation,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: InfoWindow(title: widget.dropAddress),
+        infoWindow: InfoWindow(title: widget.ride.dropoffLocation.address),
       ),
     };
   }
@@ -108,10 +101,10 @@ class _RideOngoingScreenState extends State<RideOngoingScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => RideCompleteScreen(
-          pickupAddress: widget.pickupAddress,
-          dropAddress: widget.dropAddress,
-          distance: widget.distance,
-          fare: widget.fare,
+          pickupAddress: widget.ride.pickupLocation.address,
+          dropAddress: widget.ride.dropoffLocation.address,
+          distance: widget.ride.distance,
+          fare: widget.ride.actualFare ?? widget.ride.estimatedFare ?? 0,
         ),
       ),
     );
@@ -232,7 +225,7 @@ class _RideOngoingScreenState extends State<RideOngoingScreen> {
                               ),
                               SizedBox(height: Responsive.spacing(context, 4)),
                               Text(
-                                '${widget.distance} KM',
+                                '${widget.ride.distance.toStringAsFixed(1)} KM',
                                 style: TextStyle(
                                   fontSize: Responsive.fontSize(context, 18),
                                   fontWeight: FontWeight.bold,
@@ -253,7 +246,7 @@ class _RideOngoingScreenState extends State<RideOngoingScreen> {
                               ),
                               SizedBox(height: Responsive.spacing(context, 4)),
                               Text(
-                                '₹${widget.fare.toStringAsFixed(0)}/-',
+                                '₹${(widget.ride.actualFare ?? widget.ride.estimatedFare ?? 0).toStringAsFixed(0)}/-',
                                 style: TextStyle(
                                   fontSize: Responsive.fontSize(context, 18),
                                   fontWeight: FontWeight.bold,
@@ -293,7 +286,7 @@ class _RideOngoingScreenState extends State<RideOngoingScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    widget.dropAddress,
+                                    widget.ride.dropoffLocation.address,
                                     style: TextStyle(
                                       fontSize: Responsive.fontSize(context, 16),
                                       fontWeight: FontWeight.w600,
@@ -303,7 +296,7 @@ class _RideOngoingScreenState extends State<RideOngoingScreen> {
                                   SizedBox(
                                       height: Responsive.spacing(context, 4)),
                                   Text(
-                                    widget.dropDetails,
+                                    widget.ride.dropoffLocation.address,
                                     style: TextStyle(
                                       fontSize: Responsive.fontSize(context, 12),
                                       color: _appTheme.textGrey,

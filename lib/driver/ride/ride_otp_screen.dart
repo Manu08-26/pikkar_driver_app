@@ -1,23 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/models/ride_model.dart';
+import '../../core/providers/ride_provider.dart';
 import 'ride_ongoing_screen.dart';
 
 class RideOTPScreen extends StatefulWidget {
-  final String pickupAddress;
-  final String dropAddress;
-  final String dropDetails;
-  final double distance;
-  final double fare;
+  final RideModel ride;
 
   const RideOTPScreen({
     super.key,
-    required this.pickupAddress,
-    required this.dropAddress,
-    required this.dropDetails,
-    required this.distance,
-    required this.fare,
+    required this.ride,
   });
 
   @override
@@ -70,7 +65,7 @@ class _RideOTPScreenState extends State<RideOTPScreen> {
     }
   }
 
-  void _verifyOTP() {
+  void _verifyOTP() async {
     String otp = _otpControllers.map((controller) => controller.text).join();
 
     if (otp.length != 4) {
@@ -82,29 +77,52 @@ class _RideOTPScreenState extends State<RideOTPScreen> {
       _isVerifying = true;
     });
 
-    // Simulate OTP verification
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      final rideProvider = Provider.of<RideProvider>(context, listen: false);
+      
+      // Verify OTP matches the ride OTP
+      if (rideProvider.currentRide?.otp == otp) {
+        // Start the ride
+        final success = await rideProvider.startRide();
+        
+        if (success && mounted) {
+          setState(() {
+            _isVerifying = false;
+          });
+          
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RideOngoingScreen(
+                ride: rideProvider.currentRide!,
+              ),
+            ),
+          );
+        } else if (mounted) {
+          setState(() {
+            _isVerifying = false;
+          });
+          _showError(rideProvider.errorMessage ?? 'Failed to start ride');
+        }
+      } else {
+        setState(() {
+          _isVerifying = false;
+        });
+        _showError('Invalid OTP. Please check and try again.');
+        // Clear OTP fields
+        for (var controller in _otpControllers) {
+          controller.clear();
+        }
+        _focusNodes[0].requestFocus();
+      }
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isVerifying = false;
         });
-
-        // For demo, accept any 4-digit OTP
-        // In production, verify with backend
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RideOngoingScreen(
-              pickupAddress: widget.pickupAddress,
-              dropAddress: widget.dropAddress,
-              dropDetails: widget.dropDetails,
-              distance: widget.distance,
-              fare: widget.fare,
-            ),
-          ),
-        );
+        _showError('Error verifying OTP: $e');
       }
-    });
+    }
   }
 
   void _showError(String message) {
@@ -210,7 +228,34 @@ class _RideOTPScreenState extends State<RideOTPScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                        SizedBox(height: Responsive.spacing(context, 48)),
+                        SizedBox(height: Responsive.spacing(context, 16)),
+
+                        // Show ride OTP hint for testing
+                        if (widget.ride.otp != null)
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.amber.shade200,
+                                ),
+                              ),
+                              child: Text(
+                                'OTP: ${widget.ride.otp}',
+                                style: TextStyle(
+                                  fontSize: Responsive.fontSize(context, 12),
+                                  color: Colors.amber.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        SizedBox(height: Responsive.spacing(context, 32)),
 
                         // OTP Input Fields
                         Row(

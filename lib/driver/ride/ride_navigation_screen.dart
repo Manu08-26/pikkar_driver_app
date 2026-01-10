@@ -3,24 +3,15 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/models/ride_model.dart';
 import 'ride_otp_screen.dart';
 
 class RideNavigationScreen extends StatefulWidget {
-  final String pickupAddress;
-  final String pickupDetails;
-  final String dropAddress;
-  final String dropDetails;
-  final double distance;
-  final double fare;
+  final RideModel ride;
 
   const RideNavigationScreen({
     super.key,
-    required this.pickupAddress,
-    required this.pickupDetails,
-    required this.dropAddress,
-    required this.dropDetails,
-    required this.distance,
-    required this.fare,
+    required this.ride,
   });
 
   @override
@@ -136,7 +127,7 @@ class _RideNavigationScreenState extends State<RideNavigationScreen> {
         markerId: const MarkerId('pickup'),
         position: _pickupLocation,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        infoWindow: InfoWindow(title: widget.pickupAddress),
+        infoWindow: InfoWindow(title: widget.ride.pickupLocation.address),
       ),
     };
   }
@@ -157,11 +148,7 @@ class _RideNavigationScreenState extends State<RideNavigationScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => RideOTPScreen(
-          pickupAddress: widget.pickupAddress,
-          dropAddress: widget.dropAddress,
-          dropDetails: widget.dropDetails,
-          distance: widget.distance,
-          fare: widget.fare,
+          ride: widget.ride,
         ),
       ),
     );
@@ -316,7 +303,7 @@ class _RideNavigationScreenState extends State<RideNavigationScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    widget.pickupAddress,
+                                    widget.ride.pickupLocation.address,
                                     style: TextStyle(
                                       fontSize: Responsive.fontSize(context, 16),
                                       fontWeight: FontWeight.w600,
@@ -326,7 +313,7 @@ class _RideNavigationScreenState extends State<RideNavigationScreen> {
                                   SizedBox(
                                       height: Responsive.spacing(context, 4)),
                                   Text(
-                                    widget.pickupDetails,
+                                    widget.ride.pickupLocation.address,
                                     style: TextStyle(
                                       fontSize: Responsive.fontSize(context, 12),
                                       color: _appTheme.textGrey,

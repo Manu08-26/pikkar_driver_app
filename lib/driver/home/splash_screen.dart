@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../auth/login_screen.dart';
+import 'package:provider/provider.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/services/socket_service.dart';
 import '../../core/theme/colors.dart';
+import '../../routes/app_routes.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -31,7 +34,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
 
     _controller.forward();
-    _navigateToLogin();
+    _checkAuthAndNavigate();
   }
 
   @override
@@ -40,15 +43,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
-  void _navigateToLogin() {
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-      }
-    });
+  Future<void> _checkAuthAndNavigate() async {
+    await Future.delayed(const Duration(seconds: 2));
+    
+    if (!mounted) return;
+    
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Check if user is already logged in
+    if (authProvider.isAuthenticated) {
+      // Connect socket if logged in
+      await SocketService().connect();
+      
+      // Navigate to home
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
+    } else {
+      // Navigate to original phone login screen
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
+    }
   }
 
   @override

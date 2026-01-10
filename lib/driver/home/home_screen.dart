@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+import 'dart:async';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/providers/driver_provider.dart';
+import '../../core/providers/ride_provider.dart';
+import '../../core/services/socket_service.dart';
+import '../../core/models/ride_model.dart';
 import '../ride/ride_request_screen.dart';
 import '../menu/menu_drawer.dart';
 import '../menu/earnings_screen.dart';
@@ -18,10 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final AppTheme _appTheme = AppTheme();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   GoogleMapController? _mapController;
-  bool _isOnDuty = false;
-  double _todayEarnings = 530.0;
   LatLng? _currentLocation;
   bool _showWhiteBackground = false;
+  Timer? _locationUpdateTimer;
 
   // Default location (Hyderabad)
   static const LatLng _defaultLocation = LatLng(17.385044, 78.486671);
@@ -31,12 +36,15 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _appTheme.addListener(_onThemeChanged);
     _getCurrentLocation();
+    _setupSocketListeners();
+    _startLocationUpdates();
   }
 
   @override
   void dispose() {
     _appTheme.removeListener(_onThemeChanged);
     _mapController?.dispose();
+    _locationUpdateTimer?.cancel();
     super.dispose();
   }
 
@@ -81,35 +89,86 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _toggleDutyStatus() {
-    setState(() {
-      _isOnDuty = !_isOnDuty;
+  // Setup socket listeners for incoming ride requests
+  void _setupSocketListeners() {
+    SocketService().onRideRequest.listen((ride) {
+      if (mounted) {
+        _showRideRequestDialog(ride);
+      }
     });
 
-    if (_isOnDuty) {
-      // Simulate receiving a ride request after 3 seconds
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted && _isOnDuty) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const RideRequestScreen(
-                pickupAddress: 'Hotel Grand Sitara',
-                pickupDetails: 'Abids Chiragali Line, Nampalley, Hyderabad, Telangana 500053',
-                dropAddress: 'Lulu Mall',
-                dropDetails: 'Banjara Hills Road No. 12, Hyderabad, Telangana 500002',
-                distance: 8.4,
-                fare: 70.0,
-              ),
-            ),
+    SocketService().onConnectionStatusChange.listen((isConnected) {
+      if (mounted) {
+        print('Socket connection status: $isConnected');
+      }
+    });
+  }
+
+  // Show ride request dialog
+  void _showRideRequestDialog(RideModel ride) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RideRequestScreen(
+          ride: ride,
+        ),
+      ),
+    );
+  }
+
+  // Start periodic location updates
+  void _startLocationUpdates() {
+    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+      final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+      
+      if (driverProvider.isOnline) {
+        try {
+          final position = await Geolocator.getCurrentPosition();
+          
+          // Update location via API
+          await driverProvider.updateLocation(
+            longitude: position.longitude,
+            latitude: position.latitude,
           );
+
+          // Also update via socket for real-time tracking
+          if (SocketService().isConnected) {
+            SocketService().updateDriverLocation(
+              longitude: position.longitude,
+              latitude: position.latitude,
+            );
+          }
+        } catch (e) {
+          print('Error updating location: $e');
         }
-      });
+      }
+    });
+  }
+
+  Future<void> _toggleDutyStatus() async {
+    final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+    
+    final success = await driverProvider.toggleOnlineStatus();
+    
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(driverProvider.errorMessage ?? 'Failed to toggle status'),
+          backgroundColor: _appTheme.brandRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final driverProvider = Provider.of<DriverProvider>(context);
+    final rideProvider = Provider.of<RideProvider>(context);
+    
+    // Calculate today's earnings from ride provider (could be from earnings API)
+    final todayEarnings = 530.0; // TODO: Get from earnings API
+    
     return Directionality(
       textDirection: _appTheme.textDirection,
       child: Scaffold(
@@ -132,7 +191,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 mapToolbarEnabled: false,
                 compassEnabled: true,
                 onCameraMove: (position) {
-                  // Show white background when map is moved
                   if (!_showWhiteBackground) {
                     setState(() {
                       _showWhiteBackground = true;
@@ -186,19 +244,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             // Duty Toggle
                             GestureDetector(
-                              onTap: _toggleDutyStatus,
+                              onTap: driverProvider.isLoading ? null : _toggleDutyStatus,
                               child: Container(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: Responsive.padding(context, 16),
                                   vertical: Responsive.padding(context, 10),
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _isOnDuty
+                                  color: driverProvider.isOnline
                                       ? Colors.green
                                       : Colors.grey.shade300,
                                   borderRadius: BorderRadius.circular(30),
                                   border: Border.all(
-                                    color: _isOnDuty
+                                    color: driverProvider.isOnline
                                         ? Colors.green.shade700
                                         : Colors.grey.shade400,
                                     width: 2,
@@ -208,11 +266,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      _isOnDuty ? 'On Duty' : 'Off Duty',
+                                      driverProvider.isOnline ? 'On Duty' : 'Off Duty',
                                       style: TextStyle(
                                         fontSize: Responsive.fontSize(context, 16),
                                         fontWeight: FontWeight.w600,
-                                        color: _isOnDuty
+                                        color: driverProvider.isOnline
                                             ? Colors.white
                                             : Colors.grey.shade700,
                                       ),
@@ -222,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       width: Responsive.wp(context, 8),
                                       height: Responsive.wp(context, 8),
                                       decoration: BoxDecoration(
-                                        color: _isOnDuty
+                                        color: driverProvider.isOnline
                                             ? Colors.white
                                             : Colors.grey.shade500,
                                         shape: BoxShape.circle,
@@ -294,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ],
                               ),
                               Text(
-                                '₹${_todayEarnings.toStringAsFixed(0)}/-',
+                                '₹${todayEarnings.toStringAsFixed(0)}/-',
                                 style: TextStyle(
                                   fontSize: Responsive.fontSize(context, 20),
                                   fontWeight: FontWeight.bold,
@@ -311,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
               // Offline Message
-              if (!_isOnDuty)
+              if (!driverProvider.isOnline)
                 Center(
                   child: Container(
                     padding: EdgeInsets.symmetric(

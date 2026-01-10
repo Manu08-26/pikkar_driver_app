@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/providers/ride_provider.dart';
 import '../earnings/earnings_statement_screen.dart';
 
 class EarningsScreen extends StatefulWidget {
@@ -13,25 +15,14 @@ class EarningsScreen extends StatefulWidget {
 class _EarningsScreenState extends State<EarningsScreen> {
   final AppTheme _appTheme = AppTheme();
   String _selectedPeriod = 'Today';
-
-  // Demo data
-  final double totalEarnings = 12450.50;
-  final int totalRides = 145;
-  
-  // Today's data
-  final int todayRides = 8;
-  final double todayEarnings = 1250.50;
-  final double todayDistance = 45.5; // km
-  final double todayOnlineHours = 6.5;
-  final double lastRidePayment = 285.0;
-  
-  final double weeklyEarnings = 3250.75;
-  final double monthlyEarnings = 12450.50;
+  bool _isLoading = true;
+  Map<String, dynamic>? _stats;
 
   @override
   void initState() {
     super.initState();
     _appTheme.addListener(_onThemeChanged);
+    _loadEarningsData();
   }
 
   @override
@@ -44,8 +35,58 @@ class _EarningsScreenState extends State<EarningsScreen> {
     setState(() {});
   }
 
-  String _formatCurrency(double amount) {
+  Future<void> _loadEarningsData() async {
+    setState(() => _isLoading = true);
+    
+    final rideProvider = Provider.of<RideProvider>(context, listen: false);
+    await rideProvider.fetchRideStats();
+    
+    if (mounted) {
+      setState(() {
+        _stats = rideProvider.rideStats;
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _formatCurrency(double? amount) {
+    if (amount == null) return '₹0.00';
     return '₹${amount.toStringAsFixed(2)}';
+  }
+
+  double _getTodayEarnings() {
+    if (_stats == null) return 0.0;
+    return (_stats!['todayEarnings'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  int _getTodayRides() {
+    if (_stats == null) return 0;
+    return (_stats!['todayRides'] as num?)?.toInt() ?? 0;
+  }
+
+  double _getWeeklyEarnings() {
+    if (_stats == null) return 0.0;
+    return (_stats!['weeklyEarnings'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  double _getMonthlyEarnings() {
+    if (_stats == null) return 0.0;
+    return (_stats!['monthlyEarnings'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  double _getTodayDistance() {
+    if (_stats == null) return 0.0;
+    return (_stats!['todayDistance'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  double _getTodayHours() {
+    if (_stats == null) return 0.0;
+    return (_stats!['todayHours'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  double _getLastRidePayment() {
+    if (_stats == null) return 0.0;
+    return (_stats!['lastRidePayment'] as num?)?.toDouble() ?? 0.0;
   }
 
   @override
@@ -60,7 +101,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
             Icons.arrow_back,
             color: _appTheme.textColor,
           ),
-          onPressed: () => Navigator.pop(context, true), // Return true to reopen drawer
+          onPressed: () => Navigator.pop(context, true),
         ),
         title: Text(
           'Earnings',
@@ -70,94 +111,78 @@ class _EarningsScreenState extends State<EarningsScreen> {
             color: _appTheme.textColor,
           ),
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(Responsive.padding(context, 20)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Hero Earnings Card
-            _buildHeroEarningsCard(),
-            
-            SizedBox(height: Responsive.spacing(context, 24)),
-
-            // Quick Stats Grid
-            _buildQuickStatsGrid(),
-
-            SizedBox(height: Responsive.spacing(context, 24)),
-
-            // Period Selector
-            Row(
-              children: [
-                _buildPeriodChip('Today'),
-                SizedBox(width: Responsive.spacing(context, 8)),
-                _buildPeriodChip('Week'),
-                SizedBox(width: Responsive.spacing(context, 8)),
-                _buildPeriodChip('Month'),
-              ],
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.refresh,
+              color: _appTheme.textColor,
             ),
-            SizedBox(height: Responsive.spacing(context, 20)),
+            onPressed: _loadEarningsData,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadEarningsData,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.all(Responsive.padding(context, 20)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Hero Earnings Card
+                    _buildHeroEarningsCard(),
+                    
+                    SizedBox(height: Responsive.spacing(context, 24)),
 
-            // Earnings Breakdown
-            Text(
-              'Earnings Breakdown',
-              style: TextStyle(
-                fontSize: Responsive.fontSize(context, 18),
-                fontWeight: FontWeight.bold,
-                color: _appTheme.textColor,
+                    // Quick Stats Grid
+                    _buildQuickStatsGrid(),
+
+                    SizedBox(height: Responsive.spacing(context, 24)),
+
+                    // Period Selector
+                    Row(
+                      children: [
+                        _buildPeriodChip('Today'),
+                        SizedBox(width: Responsive.spacing(context, 8)),
+                        _buildPeriodChip('Week'),
+                        SizedBox(width: Responsive.spacing(context, 8)),
+                        _buildPeriodChip('Month'),
+                      ],
+                    ),
+                    SizedBox(height: Responsive.spacing(context, 20)),
+
+                    // Earnings Breakdown
+                    Text(
+                      'Earnings Breakdown',
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(context, 18),
+                        fontWeight: FontWeight.bold,
+                        color: _appTheme.textColor,
+                      ),
+                    ),
+                    SizedBox(height: Responsive.spacing(context, 16)),
+
+                    _buildEarningTile(
+                      'Total Rides',
+                      '${_getTodayRides()} rides',
+                      _formatCurrency(_getTodayEarnings()),
+                    ),
+                    _buildEarningTile('Platform Fee', '0% Commission', '₹0'),
+                    
+                    Divider(height: 32, color: Colors.grey.shade300),
+                    
+                    _buildEarningTile(
+                      'Net Earnings',
+                      'Total for ${_selectedPeriod.toLowerCase()}',
+                      _formatCurrency(_getTodayEarnings()),
+                      isHighlighted: true,
+                    ),
+                  ],
+                ),
               ),
             ),
-            SizedBox(height: Responsive.spacing(context, 16)),
-
-            _buildEarningTile('Total Rides', '15 rides', '₹2,800'),
-            _buildEarningTile('Platform Fee', '0% Commission', '₹0'),
-            _buildEarningTile('Bonus', 'Performance', '+ ₹180'),
-            _buildEarningTile('Tips', 'From customers', '+ ₹130'),
-            
-            Divider(height: 32, color: Colors.grey.shade300),
-            
-            _buildEarningTile(
-              'Net Earnings',
-              'Total for ${_selectedPeriod.toLowerCase()}',
-              '₹3,110',
-              isHighlighted: true,
-            ),
-            
-            // SizedBox(height: Responsive.spacing(context, 24)),
-
-            // // Withdraw Button
-            // SizedBox(
-            //   width: double.infinity,
-            //   height: Responsive.hp(context, 6.5),
-            //   child: ElevatedButton.icon(
-            //     onPressed: () {
-            //       // Handle withdrawal
-            //     },
-            //     icon: Icon(
-            //       Icons.account_balance_wallet,
-            //       color: Colors.white,
-            //       size: Responsive.iconSize(context, 20),
-            //     ),
-            //     label: Text(
-            //       'Withdraw Earnings',
-            //       style: TextStyle(
-            //         fontSize: Responsive.fontSize(context, 16),
-            //         fontWeight: FontWeight.w600,
-            //         color: Colors.white,
-            //       ),
-            //     ),
-            //     style: ElevatedButton.styleFrom(
-            //       backgroundColor: _appTheme.brandRed,
-            //       elevation: 0,
-            //       shape: RoundedRectangleBorder(
-            //         borderRadius: BorderRadius.circular(12),
-            //       ),
-            //     ),
-            //   ),
-            // ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -269,7 +294,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        _formatCurrency(todayEarnings),
+                        _formatCurrency(_getTodayEarnings()),
                         style: TextStyle(
                           fontSize: Responsive.fontSize(context, 36),
                           fontWeight: FontWeight.bold,
@@ -303,7 +328,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     Expanded(
                       child: _buildTodayStatItem(
                         'Rides Completed',
-                        '$todayRides',
+                        '${_getTodayRides()}',
                         Icons.drive_eta,
                       ),
                     ),
@@ -315,7 +340,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     Expanded(
                       child: _buildTodayStatItem(
                         'Distance',
-                        '${todayDistance.toStringAsFixed(1)} km',
+                        '${_getTodayDistance().toStringAsFixed(1)} km',
                         Icons.route,
                       ),
                     ),
@@ -329,7 +354,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     Expanded(
                       child: _buildTodayStatItem(
                         'Online Hours',
-                        '${todayOnlineHours.toStringAsFixed(1)} hrs',
+                        '${_getTodayHours().toStringAsFixed(1)} hrs',
                         Icons.access_time,
                       ),
                     ),
@@ -341,7 +366,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     Expanded(
                       child: _buildTodayStatItem(
                         'Last Ride',
-                        _formatCurrency(lastRidePayment),
+                        _formatCurrency(_getLastRidePayment()),
                         Icons.payment,
                       ),
                     ),
@@ -450,14 +475,13 @@ class _EarningsScreenState extends State<EarningsScreen> {
     );
   }
 
-
   Widget _buildQuickStatsGrid() {
     return Row(
       children: [
         Expanded(
           child: _buildStatCard(
             'Weekly',
-            _formatCurrency(weeklyEarnings),
+            _formatCurrency(_getWeeklyEarnings()),
             Icons.calendar_view_week,
             const Color(0xFF2196F3),
           ),
@@ -466,7 +490,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
         Expanded(
           child: _buildStatCard(
             'Monthly',
-            _formatCurrency(monthlyEarnings),
+            _formatCurrency(_getMonthlyEarnings()),
             Icons.calendar_month,
             const Color(0xFF9C27B0),
           ),
@@ -610,4 +634,3 @@ class _EarningsScreenState extends State<EarningsScreen> {
     );
   }
 }
-
