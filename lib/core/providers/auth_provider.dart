@@ -117,6 +117,105 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // Request OTP for phone login
+  Future<bool> requestLoginOtp({
+    required String phone,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _authService.requestLoginOtp(phone: phone);
+
+      if (response.isSuccess) {
+        _errorMessage = null;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = response.message ?? 'Failed to send OTP';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Verify OTP for phone login
+  Future<bool> verifyLoginOtp({
+    required String phone,
+    required String otp,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _authService.verifyLoginOtp(phone: phone, otp: otp);
+
+      if (response.isSuccess) {
+        _user = _authService.currentUser;
+        _driver = _authService.currentDriver;
+        _errorMessage = null;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = response.message ?? 'Invalid OTP';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Exchange Firebase ID token for backend JWT tokens
+  Future<bool> loginWithFirebaseIdToken({
+    required String idToken,
+    String role = 'driver',
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _authService.loginWithFirebaseIdToken(
+        idToken: idToken,
+        role: role,
+      );
+
+      if (response.isSuccess) {
+        _user = _authService.currentUser;
+        _driver = _authService.currentDriver;
+        _errorMessage = null;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = response.message ?? 'Login failed';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Refresh user data
   Future<void> refreshUser() async {
     try {

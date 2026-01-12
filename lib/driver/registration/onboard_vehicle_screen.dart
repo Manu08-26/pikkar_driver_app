@@ -1,6 +1,4 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
 import 'upload_rc_screen.dart';
@@ -116,18 +114,6 @@ class _OnboardVehicleScreenState extends State<OnboardVehicleScreen> {
   void initState() {
     super.initState();
     _appTheme.addListener(_onThemeChanged);
-    // Auto-navigate to home after 5 seconds in debug builds to speed up testing.
-    if (kDebugMode) {
-      Future.delayed(const Duration(seconds: 5), () {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HomeScreen(),
-          ),
-        );
-      });
-    }
   }
 
   @override

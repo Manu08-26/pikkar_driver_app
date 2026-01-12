@@ -17,9 +17,21 @@ class ApiResponse<T> {
   bool get isFail => status == 'fail' || status == 'error';
 
   factory ApiResponse.fromJson(
-    Map<String, dynamic> json,
+    dynamic json,
     T Function(dynamic)? fromJsonT,
   ) {
+    // Defensive parsing: backend (or proxy) might return an array or plain string
+    // in error scenarios. Avoid runtime type crashes like:
+    // "type 'List<Object?>' is not a subtype of type 'Map<String, dynamic>'".
+    if (json is! Map<String, dynamic>) {
+      return ApiResponse(
+        status: 'fail',
+        message:
+            'Invalid server response (expected object, got ${json.runtimeType}).',
+        data: null,
+      );
+    }
+
     return ApiResponse(
       status: json['status'] ?? 'fail',
       message: json['message'],

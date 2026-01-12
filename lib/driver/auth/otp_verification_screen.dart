@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import 'dart:async';
 import '../registration/select_vehicle_screen.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/services/socket_service.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
+  final String verificationId;
+  final int? forceResendingToken;
 
   const OTPVerificationScreen({
     super.key,
     required this.phoneNumber,
+    required this.verificationId,
+    this.forceResendingToken,
   });
 
   @override
@@ -24,11 +32,15 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   int _resendTimer = 30;
   bool _canResend = false;
   Timer? _timer;
+  String? _verificationId;
+  int? _forceResendingToken;
 
   @override
   void initState() {
     super.initState();
     _appTheme.addListener(_onThemeChanged);
+    _verificationId = widget.verificationId;
+    _forceResendingToken = widget.forceResendingToken;
     _startResendTimer();
   }
 
@@ -55,7 +67,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_resendTimer > 0) {
         setState(() => _resendTimer--);
-          } else {
+      } else {
         setState(() => _canResend = true);
         timer.cancel();
       }
@@ -79,7 +91,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     }
   }
 
-  void _verifyOTP() {
+  Future<void> _verifyOTP() async {
     String otp = _otpControllers.map((controller) => controller.text).join();
     
     if (otp.length != 6) {
@@ -91,31 +103,74 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       _isVerifying = true;
     });
 
-    // Simulate OTP verification - Replace with actual API call
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _isVerifying = false;
-        });
-        
-        _showSuccess('OTP Verified Successfully!');
-        
-        // Navigate to select vehicle screen
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-                builder: (_) => const SelectVehicleScreen(),
-          ),
-        );
-          }
-        });
+    final verificationId = _verificationId;
+    if (verificationId == null || verificationId.isEmpty) {
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+      _showError('OTP session expired. Please resend OTP.');
+      return;
+    }
+
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: otp,
+      );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        throw Exception('Firebase user not found after verification');
       }
-    });
+
+      final idToken = await firebaseUser.getIdToken(true);
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Firebase idToken not found after verification');
+      }
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.loginWithFirebaseIdToken(
+        idToken: idToken,
+        role: 'driver',
+      );
+
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+
+      if (!success) {
+        _showError(authProvider.errorMessage ?? 'Login failed');
+        return;
+      }
+
+      _showSuccess('OTP Verified Successfully!');
+
+      // Connect socket after backend login
+      await SocketService().connect();
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const SelectVehicleScreen(),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+      _showError(e.message ?? 'Invalid OTP. Please try again.');
+      for (final c in _otpControllers) {
+        c.clear();
+      }
+      _focusNodes.first.requestFocus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+      _showError('Error verifying OTP: $e');
+    }
   }
 
-  void _resendOTP() {
+  Future<void> _resendOTP() async {
     if (!_canResend) return;
 
     setState(() {
@@ -123,7 +178,44 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       _resendTimer = 30;
     });
     _startResendTimer();
-    _showSuccess('OTP resent successfully');
+    final phone = widget.phoneNumber.trim();
+    final fullPhone = '+91$phone';
+
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: fullPhone,
+        forceResendingToken: _forceResendingToken,
+        verificationCompleted: (PhoneAuthCredential credential) async {},
+        verificationFailed: (FirebaseAuthException e) {
+          final code = e.code;
+          final msg = (e.message ?? '').toLowerCase();
+          final isNotAuthorized = code == 'app-not-authorized' ||
+              msg.contains('not authorized') ||
+              msg.contains('play_integrity_token');
+
+          _showError(
+            isNotAuthorized
+                ? 'Firebase Phone Auth is not authorized for this app.\n'
+                    'Ensure Firebase Console Android app matches:\n'
+                    '- package: com.pikkar.partner\n'
+                    '- SHA-1 + SHA-256 added\n'
+                    'Then download android/app/google-services.json and rebuild.'
+                : (e.message ?? 'Failed to resend OTP'),
+          );
+        },
+        codeSent: (String verificationId, int? forceResendingToken) {
+          _verificationId = verificationId;
+          _forceResendingToken = forceResendingToken;
+          _showSuccess('OTP resent successfully');
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          _verificationId = verificationId;
+        },
+        timeout: const Duration(seconds: 60),
+      );
+    } catch (e) {
+      _showError('Failed to resend OTP: $e');
+    }
   }
 
   void _showError(String message) {

@@ -1,3 +1,44 @@
+.dart_tool/
+.packages
+.pub/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# Flutter / platform generated
+**/DerivedData/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/Generated.xcconfig
+**/flutter_export_environment.sh
+**/ephemeral/
+
+# Android local config / signing
+**/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+
+# iOS local config / signing
+**/*.mobileprovision
+**/*.p8
+
+# Env files
+.env
+.env.*
+
+# Firebase configs (contain API keys / project IDs)
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Service accounts / private keys
+**/*service*account*.json
+**/*firebase*admin*.json
+**/*.pem
+**/*.key
 
 
 
@@ -52,6 +93,7 @@ app.*.map.json
 **/google-services.json
 **/GoogleService-Info.plist
 firebase_options.dart
+lib/firebase_options.dart
 
 # Environment variables
 .env

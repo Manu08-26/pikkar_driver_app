@@ -1,15 +1,38 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kReleaseMode;
+
 // API endpoints
 class ApiConstants {
-  // Base URL
-  static const String baseUrl = 'http://localhost:5000/api/v1';
-  
-  // Socket URL
-  static const String socketUrl = 'http://localhost:5000';
+  /// Override these at runtime with:
+  /// `--dart-define=API_BASE_URL=http://<ip>:5001/api/v1`
+  /// `--dart-define=SOCKET_URL=http://<ip>:5001`
+  ///
+  /// Defaults:
+  /// - Android emulator: `10.0.2.2` maps to your host machine's localhost
+  /// - iOS simulator / desktop: `localhost`
+  static String get baseUrl {
+    const defined = String.fromEnvironment('API_BASE_URL');
+    if (defined.isNotEmpty) return defined;
+
+    if (kReleaseMode) return 'http://localhost:5001/api/v1';
+    if (Platform.isAndroid) return 'http://10.0.2.2:5001/api/v1';
+    return 'http://localhost:5001/api/v1';
+  }
+
+  static String get socketUrl {
+    const defined = String.fromEnvironment('SOCKET_URL');
+    if (defined.isNotEmpty) return defined;
+
+    if (kReleaseMode) return 'http://localhost:5001';
+    if (Platform.isAndroid) return 'http://10.0.2.2:5001';
+    return 'http://localhost:5001';
+  }
   
   // Auth endpoints
   static const String login = '/auth/login';
   static const String register = '/auth/register';
   static const String verifyOtp = '/auth/verify-otp';
+  static const String firebaseAuth = '/auth/firebase';
   static const String logout = '/auth/logout';
   static const String refreshToken = '/auth/refresh-token';
   static const String me = '/auth/me';

@@ -1,5 +1,6 @@
 buildscript {
-    ext.kotlin_version = '1.9.10'
+    // Kotlin Gradle Plugin must be >= 2.1.0 for recent Google Play Services/Firebase libs
+    ext.kotlin_version = '2.1.0'
     repositories {
         google()
         mavenCentral()
@@ -8,6 +9,8 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.9.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // Needed when applying Google Services plugin conditionally from app/build.gradle
+        classpath 'com.google.gms:google-services:4.4.2'
     }
 }
 

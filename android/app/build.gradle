@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.pikkar.driver"
+    namespace "com.pikkar.partner"
     compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
@@ -42,11 +42,20 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.pikkar.driver"
+        // Must match `package_name` in android/app/google-services.json
+        applicationId "com.pikkar.partner"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+
+        // Secrets are provided locally via:
+        // - android/local.properties (recommended): MAPS_API_KEY=...
+        // - or environment variable: MAPS_API_KEY
+        // IMPORTANT: don't overwrite Flutter's placeholders (e.g. applicationName)
+        manifestPlaceholders["MAPS_API_KEY"] = (localProperties.getProperty('MAPS_API_KEY')
+                ?: System.getenv('MAPS_API_KEY')
+                ?: '')
     }
 
     buildTypes {
@@ -62,5 +71,11 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+}
+
+// Firebase (Google Services) is optional in this repo.
+// We skip applying it unless the local config file exists (to avoid committing secrets).
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
 }
 
