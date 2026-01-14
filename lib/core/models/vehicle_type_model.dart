@@ -23,15 +23,39 @@ class VehicleType {
   });
 
   factory VehicleType.fromJson(Map<String, dynamic> json) {
+    final pricing = json['pricing'] as Map<String, dynamic>?;
+    final cap = json['capacity'];
+
+    // Backend categories are 'ride' | 'parcel' | 'freight'.
+    // Driver UI uses 'ride' | 'delivery' terminology.
+    final rawCategory = (json['category'] ?? 'ride').toString();
+    final resolvedCategory = rawCategory == 'parcel' ? 'delivery' : rawCategory;
+
+    // Normalize pricing fields between ride and parcel vehicles.
+    final base = (pricing?['baseFare'] ?? pricing?['basePrice'] ?? json['baseFare']) as num?;
+    final perKm = (pricing?['perKmRate'] ?? pricing?['pricePerKm'] ?? json['perKmRate']) as num?;
+
+    int? resolvedCapacity;
+    if (cap is int) {
+      resolvedCapacity = cap;
+    } else if (cap is num) {
+      resolvedCapacity = cap.toInt();
+    } else if (cap is Map<String, dynamic>) {
+      final passengers = cap['passengers'];
+      final maxWeight = cap['maxWeight'];
+      if (passengers is num) resolvedCapacity = passengers.toInt();
+      if (resolvedCapacity == null && maxWeight is num) resolvedCapacity = maxWeight.toInt();
+    }
+
     return VehicleType(
       id: json['id'] ?? json['_id'] ?? '',
       name: json['name'] ?? '',
-      category: json['category'] ?? 'ride',
+      category: resolvedCategory,
       description: json['description'],
       icon: json['icon'],
-      baseFare: json['baseFare']?.toDouble(),
-      perKmRate: json['perKmRate']?.toDouble(),
-      capacity: json['capacity'],
+      baseFare: base?.toDouble(),
+      perKmRate: perKm?.toDouble(),
+      capacity: resolvedCapacity,
       isActive: json['isActive'] ?? true,
     );
   }

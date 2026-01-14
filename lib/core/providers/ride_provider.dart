@@ -55,6 +55,34 @@ class RideProvider with ChangeNotifier {
     });
   }
 
+  /// Driver: refresh available rides list (polling/fallback)
+  Future<void> refreshAvailableRides({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 5,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final response = await _rideService.getAvailableRides(
+        latitude: latitude,
+        longitude: longitude,
+        radiusKm: radiusKm,
+      );
+      if (response.isSuccess && response.data != null) {
+        _pendingRides = response.data!;
+        _errorMessage = null;
+      } else {
+        _errorMessage = response.message ?? 'Failed to load available rides';
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Get rides with pagination
   Future<void> getRides({
     int page = 1,
@@ -155,14 +183,14 @@ class RideProvider with ChangeNotifier {
   }
 
   // Start ride
-  Future<bool> startRide() async {
+  Future<bool> startRide({required String otp}) async {
     if (_currentRide == null) return false;
 
     _isLoading = true;
     notifyListeners();
 
     try {
-      final response = await _rideService.startRide(_currentRide!.id);
+      final response = await _rideService.startRide(_currentRide!.id, otp: otp);
 
       if (response.isSuccess && response.data != null) {
         _currentRide = response.data;

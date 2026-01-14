@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../models/driver_model.dart';
 import '../services/auth_service.dart';
+import '../services/socket_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final SocketService _socketService = SocketService();
 
   UserModel? _user;
   DriverModel? _driver;
@@ -31,6 +33,11 @@ class AuthProvider with ChangeNotifier {
       await _authService.loadUserFromStorage();
       _user = _authService.currentUser;
       _driver = _authService.currentDriver;
+
+      // If user session exists, ensure socket is connected for real-time updates.
+      if (_user != null) {
+        await _socketService.connect();
+      }
     } catch (e) {
       print('Error loading user from storage: $e');
     } finally {
@@ -39,67 +46,27 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Register
-  Future<bool> register({
-    required String firstName,
-    required String lastName,
-    required String email,
-    required String phone,
-    required String password,
-  }) async {
+  // NOTE: OTP-only app.
+  // We intentionally do not expose email/password auth methods here to avoid accidental usage.
+
+  // Login via Firebase Phone OTP (recommended)
+  Future<bool> loginWithFirebase({required String idToken}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final response = await _authService.register(
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        phone: phone,
-        password: password,
+      final response = await _authService.loginWithFirebase(
+        idToken: idToken,
         role: 'driver',
-      );
-
-      if (response.isSuccess) {
-        _user = _authService.currentUser;
-        _errorMessage = null;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = response.message ?? 'Registration failed';
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = e.toString();
-      notifyListeners();
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Login
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response = await _authService.login(
-        email: email,
-        password: password,
       );
 
       if (response.isSuccess) {
         _user = _authService.currentUser;
         _driver = _authService.currentDriver;
         _errorMessage = null;
+        // Start socket real-time after successful auth (token now available).
+        await _socketService.connect();
         notifyListeners();
         return true;
       } else {
@@ -241,6 +208,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       await _authService.logout();
+      _socketService.disconnect();
       _user = null;
       _driver = null;
       _errorMessage = null;

@@ -17,28 +17,26 @@ class ApiResponse<T> {
   bool get isFail => status == 'fail' || status == 'error';
 
   factory ApiResponse.fromJson(
-    dynamic json,
+    Map<String, dynamic> json,
     T Function(dynamic)? fromJsonT,
   ) {
-    // Defensive parsing: backend (or proxy) might return an array or plain string
-    // in error scenarios. Avoid runtime type crashes like:
-    // "type 'List<Object?>' is not a subtype of type 'Map<String, dynamic>'".
-    if (json is! Map<String, dynamic>) {
-      return ApiResponse(
-        status: 'fail',
-        message:
-            'Invalid server response (expected object, got ${json.runtimeType}).',
-        data: null,
-      );
-    }
+    // Backend compatibility:
+    // Some endpoints return { status: 'success' } while others return { success: true }.
+    final bool? successFlag = json['success'] is bool ? (json['success'] as bool) : null;
+    final String resolvedStatus = (json['status'] as String?) ??
+        (successFlag == true ? 'success' : 'fail');
+
+    // Support both `results` and `count` fields.
+    final int? resolvedResults = (json['results'] as int?) ??
+        (json['count'] is int ? (json['count'] as int) : null);
 
     return ApiResponse(
-      status: json['status'] ?? 'fail',
+      status: resolvedStatus,
       message: json['message'],
       data: json['data'] != null && fromJsonT != null
           ? fromJsonT(json['data'])
           : json['data'] as T?,
-      results: json['results'],
+      results: resolvedResults,
       pagination: json['pagination'] != null
           ? PaginationData.fromJson(json['pagination'])
           : json['data']?['pagination'] != null

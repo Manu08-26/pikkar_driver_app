@@ -16,6 +16,9 @@ class SocketService {
   final _rideRequestController = StreamController<RideModel>.broadcast();
   final _rideAcceptedController = StreamController<RideModel>.broadcast();
   final _rideStatusController = StreamController<RideModel>.broadcast();
+  final _parcelNewController = StreamController<Map<String, dynamic>>.broadcast();
+  final _parcelUnavailableController = StreamController<Map<String, dynamic>>.broadcast();
+  final _parcelUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   final _locationUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   final _connectionStatusController = StreamController<bool>.broadcast();
 
@@ -23,6 +26,9 @@ class SocketService {
   Stream<RideModel> get onRideRequest => _rideRequestController.stream;
   Stream<RideModel> get onRideAccepted => _rideAcceptedController.stream;
   Stream<RideModel> get onRideStatusUpdate => _rideStatusController.stream;
+  Stream<Map<String, dynamic>> get onParcelNew => _parcelNewController.stream;
+  Stream<Map<String, dynamic>> get onParcelUnavailable => _parcelUnavailableController.stream;
+  Stream<Map<String, dynamic>> get onParcelUpdate => _parcelUpdateController.stream;
   Stream<Map<String, dynamic>> get onLocationUpdate => _locationUpdateController.stream;
   Stream<bool> get onConnectionStatusChange => _connectionStatusController.stream;
 
@@ -72,7 +78,7 @@ class SocketService {
       _connectionStatusController.add(true);
       
       // Join driver room
-      joinRoom('driver');
+      joinRoom();
     });
 
     _socket!.onDisconnect((_) {
@@ -134,13 +140,57 @@ class SocketService {
       print('📍 Driver location update: $data');
       _locationUpdateController.add(data as Map<String, dynamic>);
     });
+
+    // Parcel events (emitted by backend)
+    _socket!.on('parcel:new', (data) {
+      // Broadcast to all drivers (new job available)
+      if (data is Map) {
+        _parcelNewController.add(Map<String, dynamic>.from(data));
+      }
+    });
+
+    _socket!.on('parcel:unavailable', (data) {
+      // Broadcast to all drivers (job claimed/cancelled)
+      if (data is Map) {
+        _parcelUnavailableController.add(Map<String, dynamic>.from(data));
+      }
+    });
+
+    _socket!.on('parcel:assigned', (data) {
+      // Sent to specific driver/user rooms
+      if (data is Map) {
+        _parcelUpdateController.add(Map<String, dynamic>.from(data));
+      }
+    });
+
+    _socket!.on('parcel:status:update', (data) {
+      if (data is Map) {
+        _parcelUpdateController.add(Map<String, dynamic>.from(data));
+      }
+    });
+
+    _socket!.on('parcel:delivered', (data) {
+      if (data is Map) {
+        _parcelUpdateController.add(Map<String, dynamic>.from(data));
+      }
+    });
   }
 
   // Join a room
-  void joinRoom(String room) {
+  Future<void> joinRoom() async {
     if (_socket?.connected == true) {
-      _socket!.emit(ApiConstants.socketJoin, room);
-      print('Joined room: $room');
+      final user = await _tokenStorage.getUser();
+      final userId = user?.id;
+      final role = user?.role ?? 'driver';
+
+      if (userId != null && userId.isNotEmpty) {
+        _socket!.emit(ApiConstants.socketJoin, {'userId': userId, 'role': role});
+        print('Joined socket as $role (userId=$userId)');
+      } else {
+        // Backward compatibility: at least join role room
+        _socket!.emit(ApiConstants.socketJoin, {'userId': '', 'role': role});
+        print('Joined socket with role=$role');
+      }
     }
   }
 
@@ -197,6 +247,9 @@ class SocketService {
     _rideRequestController.close();
     _rideAcceptedController.close();
     _rideStatusController.close();
+    _parcelNewController.close();
+    _parcelUnavailableController.close();
+    _parcelUpdateController.close();
     _locationUpdateController.close();
     _connectionStatusController.close();
   }

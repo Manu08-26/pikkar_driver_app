@@ -5,6 +5,7 @@ import 'core/theme/colors.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/driver_provider.dart';
 import 'core/providers/ride_provider.dart';
+import 'core/providers/parcel_provider.dart';
 
 class RapidoApp extends StatelessWidget {
   const RapidoApp({super.key});
@@ -16,6 +17,7 @@ class RapidoApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => DriverProvider()),
         ChangeNotifierProvider(create: (_) => RideProvider()),
+        ChangeNotifierProvider(create: (_) => ParcelProvider()),
       ],
       child: MaterialApp(
         title: 'Pikkar Driver',

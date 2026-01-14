@@ -16,7 +16,10 @@ class AuthService {
   UserModel? get currentUser => _currentUser;
   DriverModel? get currentDriver => _currentDriver;
 
-  // Register new user/driver
+  // OTP-only app:
+  // We intentionally do not support email/password login/register in the driver app.
+  // Keeping these methods out avoids accidental API usage in production.
+  @Deprecated('OTP-only app: use loginWithFirebase()')
   Future<ApiResponse<Map<String, dynamic>>> register({
     required String firstName,
     required String lastName,
@@ -25,158 +28,26 @@ class AuthService {
     required String password,
     String role = 'driver',
   }) async {
-    try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
-        ApiConstants.register,
-        data: {
-          'firstName': firstName,
-          'lastName': lastName,
-          'email': email,
-          'phone': phone,
-          'password': password,
-          'role': role,
-        },
-        fromJson: (json) => json as Map<String, dynamic>,
-      );
-
-      if (response.isSuccess && response.data != null) {
-        // Save user and tokens
-        final user = UserModel.fromJson(response.data!['user']);
-        final tokens = AuthTokens.fromJson(response.data!['tokens']);
-        
-        await _tokenStorage.saveUser(user);
-        await _tokenStorage.saveTokens(tokens);
-        _currentUser = user;
-      }
-
-      return response;
-    } catch (e) {
-      return ApiResponse(
-        status: 'fail',
-        message: e.toString(),
-      );
-    }
+    throw UnsupportedError('OTP-only app: use Firebase phone OTP + /auth/firebase exchange.');
   }
 
-  // Login with email and password
+  @Deprecated('OTP-only app: use loginWithFirebase()')
   Future<ApiResponse<Map<String, dynamic>>> login({
     required String email,
     required String password,
   }) async {
-    try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
-        ApiConstants.login,
-        data: {
-          'email': email,
-          'password': password,
-        },
-        fromJson: (json) => json as Map<String, dynamic>,
-      );
-
-      if (response.isSuccess && response.data != null) {
-        // Save user and tokens
-        final user = UserModel.fromJson(response.data!['user']);
-        final tokens = AuthTokens.fromJson(response.data!['tokens']);
-        
-        await _tokenStorage.saveUser(user);
-        await _tokenStorage.saveTokens(tokens);
-        _currentUser = user;
-
-        // If user is a driver, fetch driver profile
-        if (user.role == 'driver') {
-          await getCurrentDriver();
-        }
-      }
-
-      return response;
-    } catch (e) {
-      return ApiResponse(
-        status: 'fail',
-        message: e.toString(),
-      );
-    }
+    throw UnsupportedError('OTP-only app: use Firebase phone OTP + /auth/firebase exchange.');
   }
 
-  // Request OTP for phone login (sends OTP to phone)
-  Future<ApiResponse<Map<String, dynamic>>> requestLoginOtp({
-    required String phone,
-  }) async {
-    try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
-        ApiConstants.login,
-        data: {
-          'phone': phone,
-        },
-        fromJson: (json) => json as Map<String, dynamic>,
-      );
-
-      return response;
-    } catch (e) {
-      return ApiResponse(
-        status: 'fail',
-        message: e.toString(),
-      );
-    }
-  }
-
-  // Verify OTP for phone login (exchanges OTP for tokens)
-  Future<ApiResponse<Map<String, dynamic>>> verifyLoginOtp({
-    required String phone,
-    required String otp,
-  }) async {
-    try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
-        ApiConstants.verifyOtp,
-        data: {
-          'phone': phone,
-          'otp': otp,
-        },
-        fromJson: (json) => json as Map<String, dynamic>,
-      );
-
-      if (response.isSuccess && response.data != null) {
-        final payload = response.data!;
-
-        final userJson = payload['user'];
-        final tokensJson = payload['tokens'];
-        final driverJson = payload['driver'];
-
-        if (userJson is Map<String, dynamic> && tokensJson is Map<String, dynamic>) {
-          final user = UserModel.fromJson(userJson);
-          final tokens = AuthTokens.fromJson(tokensJson);
-
-          await _tokenStorage.saveUser(user);
-          await _tokenStorage.saveTokens(tokens);
-          _currentUser = user;
-
-          if (driverJson is Map<String, dynamic>) {
-            final driver = DriverModel.fromJson(driverJson);
-            await _tokenStorage.saveDriver(driver);
-            _currentDriver = driver;
-          } else if (user.role == 'driver') {
-            // If user is a driver, try loading driver profile from storage
-            await getCurrentDriver();
-          }
-        }
-      }
-
-      return response;
-    } catch (e) {
-      return ApiResponse(
-        status: 'fail',
-        message: e.toString(),
-      );
-    }
-  }
-
-  // Exchange Firebase ID token for backend JWT tokens
-  Future<ApiResponse<Map<String, dynamic>>> loginWithFirebaseIdToken({
+  /// Login via Firebase Phone OTP (recommended for drivers)
+  /// Backend exchange: POST /auth/firebase { idToken, role: 'driver' }
+  Future<ApiResponse<Map<String, dynamic>>> loginWithFirebase({
     required String idToken,
     String role = 'driver',
   }) async {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
-        ApiConstants.firebaseAuth,
+        ApiConstants.firebaseLogin,
         data: {
           'idToken': idToken,
           'role': role,
@@ -185,28 +56,12 @@ class AuthService {
       );
 
       if (response.isSuccess && response.data != null) {
-        final payload = response.data!;
+        final user = UserModel.fromJson(response.data!['user']);
+        final tokens = AuthTokens.fromJson(response.data!['tokens']);
 
-        final userJson = payload['user'];
-        final tokensJson = payload['tokens'];
-        final driverJson = payload['driver'];
-
-        if (userJson is Map<String, dynamic> && tokensJson is Map<String, dynamic>) {
-          final user = UserModel.fromJson(userJson);
-          final tokens = AuthTokens.fromJson(tokensJson);
-
-          await _tokenStorage.saveUser(user);
-          await _tokenStorage.saveTokens(tokens);
-          _currentUser = user;
-
-          if (driverJson is Map<String, dynamic>) {
-            final driver = DriverModel.fromJson(driverJson);
-            await _tokenStorage.saveDriver(driver);
-            _currentDriver = driver;
-          } else if (user.role == 'driver') {
-            await getCurrentDriver();
-          }
-        }
+        await _tokenStorage.saveUser(user);
+        await _tokenStorage.saveTokens(tokens);
+        _currentUser = user;
       }
 
       return response;
@@ -243,21 +98,17 @@ class AuthService {
   // Get current driver profile (if user is a driver)
   Future<ApiResponse<DriverModel>> getCurrentDriver() async {
     try {
-      // This would need a driver profile endpoint
-      // For now, we'll check if driver data exists in storage
-      final driver = await _tokenStorage.getDriver();
-      if (driver != null) {
-        _currentDriver = driver;
-        return ApiResponse(
-          status: 'success',
-          data: driver,
-        );
+      final response = await _apiClient.get<DriverModel>(
+        ApiConstants.driverProfile,
+        fromJson: (json) => DriverModel.fromJson((json as Map<String, dynamic>)['driver']),
+      );
+
+      if (response.isSuccess && response.data != null) {
+        _currentDriver = response.data;
+        await _tokenStorage.saveDriver(response.data!);
       }
 
-      return ApiResponse(
-        status: 'fail',
-        message: 'Driver profile not found',
-      );
+      return response;
     } catch (e) {
       return ApiResponse(
         status: 'fail',

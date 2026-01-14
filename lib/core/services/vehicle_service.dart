@@ -11,17 +11,29 @@ class VehicleService {
     String? category, // 'ride' or 'delivery'
   }) async {
     try {
+      // Backend:
+      // - Ride vehicle types: GET /vehicle-types?category=ride -> { status, data:{ vehicleTypes:[...] } }
+      // - Parcel vehicles:     GET /parcel-vehicles/active   -> { success:true, data:[...] }
+      if (category == 'delivery') {
+        final response = await _apiClient.get<List<VehicleType>>(
+          '/parcel-vehicles/active',
+          fromJson: (json) {
+            final vehicles = (json as List);
+            return vehicles.map((v) => VehicleType.fromJson(v as Map<String, dynamic>)).toList();
+          },
+        );
+        return response;
+      }
+
       final queryParams = category != null ? {'category': category} : null;
-      
       final response = await _apiClient.get<List<VehicleType>>(
         ApiConstants.vehicleTypes,
         queryParameters: queryParams,
         fromJson: (json) {
-          final vehicles = json['vehicleTypes'] as List;
-          return vehicles.map((v) => VehicleType.fromJson(v)).toList();
+          final vehicles = (json as Map<String, dynamic>)['vehicleTypes'] as List;
+          return vehicles.map((v) => VehicleType.fromJson(v as Map<String, dynamic>)).toList();
         },
       );
-
       return response;
     } catch (e) {
       return ApiResponse(

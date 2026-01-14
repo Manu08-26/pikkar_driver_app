@@ -80,12 +80,10 @@ class _RideOTPScreenState extends State<RideOTPScreen> {
     try {
       final rideProvider = Provider.of<RideProvider>(context, listen: false);
       
-      // Verify OTP matches the ride OTP
-      if (rideProvider.currentRide?.otp == otp) {
-        // Start the ride
-        final success = await rideProvider.startRide();
-        
-        if (success && mounted) {
+      // Start the ride (backend verifies OTP)
+      final success = await rideProvider.startRide(otp: otp);
+
+      if (success && mounted) {
           setState(() {
             _isVerifying = false;
           });
@@ -98,17 +96,11 @@ class _RideOTPScreenState extends State<RideOTPScreen> {
               ),
             ),
           );
-        } else if (mounted) {
-          setState(() {
-            _isVerifying = false;
-          });
-          _showError(rideProvider.errorMessage ?? 'Failed to start ride');
-        }
       } else {
         setState(() {
           _isVerifying = false;
         });
-        _showError('Invalid OTP. Please check and try again.');
+        _showError(rideProvider.errorMessage ?? 'Invalid OTP. Please check and try again.');
         // Clear OTP fields
         for (var controller in _otpControllers) {
           controller.clear();
@@ -230,31 +222,7 @@ class _RideOTPScreenState extends State<RideOTPScreen> {
                         ),
                         SizedBox(height: Responsive.spacing(context, 16)),
 
-                        // Show ride OTP hint for testing
-                        if (widget.ride.otp != null)
-                          Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.amber.shade200,
-                                ),
-                              ),
-                              child: Text(
-                                'OTP: ${widget.ride.otp}',
-                                style: TextStyle(
-                                  fontSize: Responsive.fontSize(context, 12),
-                                  color: Colors.amber.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
+                        // OTP is intentionally not shown to drivers in production.
                         SizedBox(height: Responsive.spacing(context, 32)),
 
                         // OTP Input Fields

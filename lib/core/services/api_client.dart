@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import '../constants/api_constants.dart';
-import '../models/auth_tokens.dart';
 import '../models/api_response.dart';
+import '../models/auth_tokens.dart';
 import 'token_storage_service.dart';
 
 class ApiClient {
@@ -94,7 +95,7 @@ class ApiClient {
   }
 
   // Refresh token
-  Future<AuthTokens?> _refreshToken(String refreshToken) async {
+  Future<dynamic> _refreshToken(String refreshToken) async {
     try {
       final response = await _dio.post(
         ApiConstants.refreshToken,
@@ -102,12 +103,10 @@ class ApiClient {
       );
 
       if (response.statusCode == 200 && response.data['status'] == 'success') {
-        final tokensJson = response.data['data']?['tokens'];
-        if (tokensJson is Map<String, dynamic>) {
-          final tokens = AuthTokens.fromJson(tokensJson);
-          await _tokenStorage.saveTokens(tokens);
-          return tokens;
-        }
+        final tokens = response.data['data']['tokens'];
+        final authTokens = AuthTokens.fromJson(tokens as Map<String, dynamic>);
+        await _tokenStorage.saveTokens(authTokens);
+        return authTokens;
       }
       return null;
     } catch (e) {
@@ -195,39 +194,10 @@ class ApiClient {
     String message = 'An error occurred';
 
     if (error.type == DioExceptionType.connectionTimeout ||
-        error.type == DioExceptionType.receiveTimeout ||
-        error.type == DioExceptionType.sendTimeout) {
-      // Same symptom as connectionError when pointing at emulator-only hostnames.
-      final baseUrl = ApiConstants.baseUrl;
-      if (Platform.isAndroid &&
-          (baseUrl.contains('10.0.2.2') || baseUrl.contains('localhost'))) {
-        message =
-            'Connection timeout.\n'
-            'If you are running on a PHYSICAL Android device, it cannot reach '
-            'your laptop backend via 10.0.2.2/localhost.\n\n'
-            'Fix:\n'
-            '--dart-define=API_BASE_URL=http://<YOUR_LAN_IP>:5001/api/v1\n'
-            '--dart-define=SOCKET_URL=http://<YOUR_LAN_IP>:5001\n'
-            'or (USB) run: adb reverse tcp:5001 tcp:5001';
-      } else {
-        message = 'Connection timeout. Please check your internet connection.';
-      }
+        error.type == DioExceptionType.receiveTimeout) {
+      message = 'Connection timeout. Please check your internet connection.';
     } else if (error.type == DioExceptionType.connectionError) {
-      // Common local-dev pitfall:
-      // - Android emulator can reach host machine at 10.0.2.2
-      // - Physical Android device CANNOT; it needs your machine LAN IP
-      final baseUrl = ApiConstants.baseUrl;
-      if (Platform.isAndroid && baseUrl.contains('10.0.2.2')) {
-        message =
-            'Cannot connect to server. On a physical Android device, 10.0.2.2 only works on emulators.\n'
-            'Run with:\n'
-            '--dart-define=API_BASE_URL=http://<YOUR_LAN_IP>:5001/api/v1\n'
-            '--dart-define=SOCKET_URL=http://<YOUR_LAN_IP>:5001\n'
-            'and ensure the backend is running.';
-      } else {
-        message =
-            'Cannot connect to server. Check API URL and ensure backend is running.';
-      }
+      message = 'No internet connection. Please check your network.';
     } else if (error.response != null) {
       final responseData = error.response!.data;
       if (responseData is Map<String, dynamic>) {

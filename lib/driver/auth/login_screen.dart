@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'otp_verification_screen.dart';
 import '../registration/select_vehicle_screen.dart';
 import '../../core/theme/app_theme.dart';
@@ -66,11 +65,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {});
   }
 
-  Future<void> _handleContinue() async {
-    print('📲 Login Continue clicked');
+  void _handleContinue() {
     // Validate phone number
     if (_phoneController.text.isEmpty || _phoneController.text.length < 10) {
-      print('⚠️ Invalid phone input: "${_phoneController.text}"');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please enter a valid phone number'),
@@ -86,115 +83,44 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    final phone = _phoneController.text.trim();
-    final fullPhone = '+91$phone';
-    print('📨 Sending Firebase OTP to: $fullPhone');
+    final phone = '+91${_phoneController.text}';
 
-    try {
-      // Guard: if Firebase isn't initialized/configured, PhoneAuth will throw [core/no-app]
-      if (Firebase.apps.isEmpty) {
-        print('❌ Firebase not initialized (Firebase.apps is empty)');
+    FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: phone,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        // Auto-verification (rare). Sign in silently.
+        try {
+          await FirebaseAuth.instance.signInWithCredential(credential);
+        } catch (_) {}
+      },
+      verificationFailed: (FirebaseAuthException e) {
         if (!mounted) return;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text(
-              'Firebase is not configured. Add android/app/google-services.json and restart the app.',
-            ),
+            content: Text(e.message ?? 'Failed to send OTP'),
             backgroundColor: _appTheme.brandRed,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+          ),
+        );
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OTPVerificationScreen(
+              phoneNumber: phone,
+              verificationId: verificationId,
             ),
           ),
         );
-        return;
-      }
-
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: fullPhone,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          // Auto-retrieval on Android sometimes provides the credential.
-          // We'll let the OTP screen handle manual entry in most cases.
-          print('✅ Firebase verificationCompleted (auto-retrieval)');
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          print('❌ Firebase verificationFailed');
-          print('   code=${e.code}');
-          print('   message=${e.message}');
-          print('   stackTrace=${e.stackTrace}');
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-
-          // A very common setup issue:
-          // - Firebase Console app entry doesn't match applicationId (package name)
-          // - SHA-1/SHA-256 not added in Firebase Console
-          // Which leads to: app-not-authorized / Invalid app info in play_integrity_token
-          final code = e.code;
-          final msg = (e.message ?? '').toLowerCase();
-          final isNotAuthorized = code == 'app-not-authorized' ||
-              msg.contains('not authorized') ||
-              msg.contains('play_integrity_token');
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                isNotAuthorized
-                    ? 'Firebase Phone Auth is not authorized for this app.\n'
-                        'Fix in Firebase Console:\n'
-                        '- Android package name must be: com.pikkar.partner\n'
-                        '- Add SHA-1 and SHA-256 (debug keystore)\n'
-                        '- Download a fresh android/app/google-services.json\n'
-                        'Then: flutter clean && flutter pub get && flutter run'
-                    : (e.message ?? 'Failed to send OTP'),
-              ),
-              backgroundColor: _appTheme.brandRed,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          );
-        },
-        codeSent: (String verificationId, int? forceResendingToken) {
-          print('✅ Firebase codeSent');
-          print('   verificationId=$verificationId');
-          print('   forceResendingToken=$forceResendingToken');
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OTPVerificationScreen(
-                phoneNumber: phone,
-                verificationId: verificationId,
-                forceResendingToken: forceResendingToken,
-              ),
-            ),
-          );
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          // No-op. User can still enter OTP manually.
-          print('⏱️ Firebase codeAutoRetrievalTimeout');
-          print('   verificationId=$verificationId');
-        },
-        timeout: const Duration(seconds: 60),
-      );
-    } catch (e) {
-      print('❌ Exception while sending Firebase OTP: $e');
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send OTP: $e'),
-          backgroundColor: _appTheme.brandRed,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      );
-    }
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        // no-op
+      },
+    );
   }
 
   @override

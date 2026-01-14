@@ -62,7 +62,9 @@ class DriverModel {
       isOnline: json['isOnline'] ?? false,
       isAvailable: json['isAvailable'] ?? false,
       rating: (json['rating'] ?? 0.0).toDouble(),
-      verificationStatus: json['verificationStatus'] ?? 'pending',
+      // Backend uses `status` (pending/approved/rejected). Keep `verificationStatus`
+      // for UI compatibility, but map from `status` first.
+      verificationStatus: json['status'] ?? json['verificationStatus'] ?? 'pending',
       totalRides: json['totalRides'] ?? 0,
       totalEarnings: (json['totalEarnings'] ?? 0.0).toDouble(),
     );

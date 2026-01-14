@@ -6,6 +6,34 @@ import '../constants/api_constants.dart';
 class RideService {
   final ApiClient _apiClient = ApiClient();
 
+  // Driver: fetch available ride requests near current location
+  Future<ApiResponse<List<RideModel>>> getAvailableRides({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 5,
+  }) async {
+    try {
+      final response = await _apiClient.get<List<RideModel>>(
+        ApiConstants.ridesAvailable,
+        queryParameters: {
+          'latitude': latitude,
+          'longitude': longitude,
+          'radiusKm': radiusKm,
+        },
+        fromJson: (json) {
+          final rides = (json['rides'] ?? []) as List;
+          return rides.map((r) => RideModel.fromJson(r)).toList();
+        },
+      );
+      return response;
+    } catch (e) {
+      return ApiResponse(
+        status: 'fail',
+        message: e.toString(),
+      );
+    }
+  }
+
   // Request a new ride (User functionality, but included for completeness)
   Future<ApiResponse<RideModel>> requestRide({
     required List<double> pickupCoordinates,
@@ -115,11 +143,15 @@ class RideService {
   Future<ApiResponse<RideModel>> updateRideStatus({
     required String rideId,
     required String status,
+    String? otp,
   }) async {
     try {
       final response = await _apiClient.put<RideModel>(
         '${ApiConstants.rides}/$rideId/status',
-        data: {'status': status},
+        data: {
+          'status': status,
+          if (otp != null) 'otp': otp,
+        },
         fromJson: (json) => RideModel.fromJson(json['ride']),
       );
 
@@ -138,8 +170,8 @@ class RideService {
   }
 
   // Start ride
-  Future<ApiResponse<RideModel>> startRide(String rideId) async {
-    return updateRideStatus(rideId: rideId, status: 'started');
+  Future<ApiResponse<RideModel>> startRide(String rideId, {required String otp}) async {
+    return updateRideStatus(rideId: rideId, status: 'started', otp: otp);
   }
 
   // Complete ride

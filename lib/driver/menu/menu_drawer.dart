@@ -13,6 +13,10 @@ import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
 import 'refund_policy_screen.dart';
 import '../auth/login_screen.dart';
+import '../parcel/available_parcels_screen.dart';
+import '../parcel/parcel_history_screen.dart';
+import 'package:provider/provider.dart';
+import '../../core/providers/auth_provider.dart';
 
 class MenuDrawer extends StatefulWidget {
   final GlobalKey<ScaffoldState> scaffoldKey;
@@ -79,6 +83,8 @@ class _MenuDrawerState extends State<MenuDrawer> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context); // Close dialog
+              // Clear backend session + local tokens
+              Provider.of<AuthProvider>(context, listen: false).logout().catchError((_) {});
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -218,6 +224,16 @@ class _MenuDrawerState extends State<MenuDrawer> {
                     icon: Icons.history,
                     title: 'Ride History',
                     onTap: () => _navigateToScreen(const RideHistoryScreen()),
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Parcel Jobs',
+                    onTap: () => _navigateToScreen(const AvailableParcelsScreen()),
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.inventory_outlined,
+                    title: 'Parcel History',
+                    onTap: () => _navigateToScreen(const ParcelHistoryScreen()),
                   ),
                   _buildMenuItem(
                     icon: Icons.card_membership_outlined,
